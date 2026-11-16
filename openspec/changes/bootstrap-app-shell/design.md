@@ -4,7 +4,7 @@
 
 El repo está vacío salvo licencia, README y OpenSpec. El proyecto es una aplicación de escritorio para Windows 11 y Linux sobre Electron (decisión tomada tras comparar con Tauri: Chromium propio da el mismo render en cualquier distro). Convenciones del hub de Fredo que se respetan: npm, TypeScript, React + Vite, ESLint + Prettier. No hay backend ni base de datos. Motivación y alcance en `proposal.md`; requisitos en `specs/`.
 
-Estado verificado en esta máquina (spikes): Node 24, Electron 45.3.3 arranca, y npm 11 **no** ejecuta los scripts de instalación sin aprobación, así que el binario de Electron no se descargaba solo.
+Estado verificado en esta máquina: Node 24, Electron 45.3.3 arranca. El paquete `electron` 45 **no tiene script de instalación** (no hay nada que aprobar en npm 11) y su descarga perezosa no la dispara `electron-vite`, que falla con `Electron uninstall` si falta el binario (comprobado al implementar). Por eso el proyecto declara su propio script `postinstall` (`install-electron`). Sí habrá aprobación de scripts para `node-pty` en `terminal-core`.
 
 ## Goals / Non-Goals
 
@@ -34,7 +34,7 @@ Estado verificado en esta máquina (spikes): Node 24, Electron 45.3.3 arranca, y
 
 **D6. Calidad:** TypeScript en modo estricto, ESLint (flat config) + Prettier, Vitest para lógica pura (esquemas del contrato, resolución de idioma, paridad de catálogos), Playwright con `_electron` para el humo: la app arranca, el título es el esperado, `window.require` y `window.process` no existen, `window.helix.getInfo()` devuelve versión y plataforma, una navegación externa se cancela, y un segundo lanzamiento con el mismo directorio de datos termina enfocando al primero. Los tests usan un directorio de usuario temporal y **no abren ningún shell**.
 
-**D7. CI en GitHub Actions** con matriz `windows-latest` y `ubuntu-latest`: `npm ci`, lint, tipos, tests, build y humo (con `xvfb-run` en Linux). El script de instalación de Electron se aprueba con `npm install-scripts approve electron`, que lo registra en `package.json`.
+**D7. CI en GitHub Actions** con matriz `windows-latest` y `ubuntu-latest`: `npm ci`, lint, tipos, tests, build y humo (con `xvfb-run` en Linux). El binario de Electron lo descarga el `postinstall` durante `npm ci`; el job cachea esa descarga para que un fallo de red no parezca un fallo de la aplicación.
 
 **D8. Versionado:** SemVer. El proyecto arranca en `0.1.0`; `1.0.0` al estabilizar el MVP. Las versiones de dependencias se fijan exactas al implementar.
 
@@ -44,7 +44,8 @@ Estado verificado en esta máquina (spikes): Node 24, Electron 45.3.3 arranca, y
 - **CSP con meta en `file://` es más débil que cabeceras reales** → compensado con `sandbox`, aislamiento de contexto y validación de emisor; se reevalúa con `app://`.
 - **Cadencia de Electron (versión mayor cada pocas semanas)** → versión exacta fijada y actualización deliberada, no automática.
 - **Relajación de CSP en desarrollo** podría filtrarse a producción → el humo corre sobre el build de producción y comprueba que un script en línea se bloquea.
-- **TypeScript 7 es muy reciente** (la versión actual del registro) → verificar compatibilidad con ESLint y Vitest al implementar; si falla, fijar la última 5.x/6.x estable.
+- **TypeScript 7 no es compatible con `typescript-eslint`** (su peer exige `<6.1.0`; verificado al implementar) → se fija TypeScript **6.0.3**; se actualiza a 7 cuando `typescript-eslint` lo soporte.
+- **La instalación necesita red** para descargar el binario de Electron (`postinstall`) → se documenta en el README y el CI cachea la descarga.
 - **Marco nativo vs. estética sci-fi** → aceptado por ahora; el cambio a barra propia afectará a `app-shell` y se hará con su propia modificación de spec en `theming-scifi`.
 
 ## Open Questions

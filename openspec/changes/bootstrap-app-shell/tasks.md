@@ -2,10 +2,10 @@
 
 ## 1. Andamiaje del proyecto
 
-- [ ] 1.1 Crear `package.json` (versión `0.1.0`, licencia Apache-2.0), configuración de `electron-vite` y carpetas `src/main`, `src/preload`, `src/renderer`, `src/shared`; verificar que `npm run dev` abre una ventana vacía
-- [ ] 1.2 Fijar versiones exactas de Electron, `electron-vite`, React, Vite y TypeScript (estricto); verificar con `npm run typecheck` sin errores
-- [ ] 1.3 Configurar ESLint (flat config), Prettier y `.editorconfig`; verificar que `npm run lint` pasa sobre el esqueleto
-- [ ] 1.4 Aprobar el script de instalación de Electron con `npm install-scripts approve electron`; verificar que un `npm ci` en una carpeta limpia descarga el binario sin pasos manuales
+- [x] 1.1 Crear `package.json` (versión `0.1.0`, licencia Apache-2.0), configuración de `electron-vite` y carpetas `src/main`, `src/preload`, `src/renderer`, `src/shared`; verificar que `npm run dev` abre una ventana vacía
+- [x] 1.2 Fijar versiones exactas de Electron, `electron-vite`, React, Vite y TypeScript 6.0.3 (estricto; la 7 no es compatible con `typescript-eslint`); verificar con `npm run typecheck` sin errores
+- [x] 1.3 Configurar ESLint (flat config), Prettier y `.editorconfig`; verificar que `npm run lint` pasa sobre el esqueleto
+- [x] 1.4 Declarar el script `postinstall` (`install-electron`), porque Electron 45 no trae script de instalación y `electron-vite` no descarga el binario; verificar que en una copia limpia del repo `npm ci` deja `node_modules/electron/dist/electron.exe` sin pasos manuales
 
 ## 2. Ventana y seguridad (`app-shell`)
 
@@ -36,7 +36,7 @@
 
 ## 6. Integración continua
 
-- [ ] 6.1 Crear `.github/workflows/ci.yml` con matriz `windows-latest` y `ubuntu-latest` (`npm ci`, lint, tipos, tests, build, humo con `xvfb-run` en Linux); verificar que el workflow queda verde en ambos sistemas tras un push
+- [ ] 6.1 Crear `.github/workflows/ci.yml` con matriz `windows-latest` y `ubuntu-latest` (`npm ci`, lint, tipos, tests, build, humo con `xvfb-run` en Linux); cachear la descarga del binario de Electron que hace el `postinstall`; verificar que el workflow queda verde en ambos sistemas tras un push
 - [ ] 6.2 Ajustar en el runner de Ubuntu la restricción de user namespaces para que Chromium arranque con sandbox activo, sin `--no-sandbox`; verificar que el humo de Linux pasa y que la app no usa `--no-sandbox` en ningún lugar del código
 
 ## 7. Documentación
