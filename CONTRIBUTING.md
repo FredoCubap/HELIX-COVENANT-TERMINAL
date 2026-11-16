@@ -29,10 +29,10 @@ Haz un esbozo de cinco minutos: nombre de la rama, commits previstos y si el tra
 <prefijo>/<ref>-descripcion-breve
 ```
 
-| Origen | `<ref>` | Ejemplo |
-|---|---|---|
+| Origen             | `<ref>`                                                          | Ejemplo                                                         |
+| ------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------- |
 | Change de OpenSpec | nombre del change; si se divide en varios PRs, se añade la parte | `feat/bootstrap-app-shell`, `feat/terminal-core-flujo-de-datos` |
-| Issue de GitHub | `gh-` + número del issue | `fix/gh-12-glow-pierde-contexto` |
+| Issue de GitHub    | `gh-` + número del issue                                         | `fix/gh-12-glow-pierde-contexto`                                |
 
 - Se crea desde `main` actualizado. Una rama por change (o por parte de un change) o por issue.
 - Prefijo: el mismo que el del cambio principal (ver [prefijos](#prefijos)).
@@ -73,7 +73,7 @@ git push --force-with-lease
 <prefijo>: <descripcion>
 ```
 
-- Verbo en tercera persona singular del presente: *agrega*, *corrige*, *elimina*. Nunca en infinitivo (*agregar*) ni en participio (*adicionado*).
+- Verbo en tercera persona singular del presente: _agrega_, _corrige_, _elimina_. Nunca en infinitivo (_agregar_) ni en participio (_adicionado_).
 - Minúscula tras los dos puntos y sin punto final.
 - Se permiten tildes y `ñ`.
 - Sin paréntesis. Si hace falta aclarar algo, va en el body.
@@ -87,15 +87,15 @@ Los commits escritos por un agente de IA llevan al final su trailer `Co-Authored
 
 ### Prefijos
 
-| Prefijo | Uso |
-|---|---|
-| `feat` | Funcionalidad nueva o cambio visible para el usuario |
-| `fix` | Corrección de un error |
-| `refactor` | Cambio interno sin cambio de comportamiento |
-| `test` | Solo tests |
-| `docs` | Solo documentación (incluye los specs de OpenSpec) |
-| `chore` | Dependencias, configuración, tooling |
-| `ci` | Workflows de GitHub Actions y scripts de CI |
+| Prefijo    | Uso                                                  |
+| ---------- | ---------------------------------------------------- |
+| `feat`     | Funcionalidad nueva o cambio visible para el usuario |
+| `fix`      | Corrección de un error                               |
+| `refactor` | Cambio interno sin cambio de comportamiento          |
+| `test`     | Solo tests                                           |
+| `docs`     | Solo documentación (incluye los specs de OpenSpec)   |
+| `chore`    | Dependencias, configuración, tooling                 |
+| `ci`       | Workflows de GitHub Actions y scripts de CI          |
 
 ### Body
 
