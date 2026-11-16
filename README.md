@@ -17,3 +17,7 @@ Fase de diseño. Sin código todavía.
 ## Referencias
 
 Material de estudio en `Repos de referencia/` (no versionado). Ver el README de esa carpeta.
+
+## Licencia
+
+Apache-2.0. Ver `LICENSE`. Las redistribuciones deben conservar el archivo `NOTICE` con la atribución a FredoCubap.
