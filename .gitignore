@@ -1,1 +1,25 @@
+# Material ajeno de referencia (solo lectura)
 Repos de referencia/
+
+# Specs de OpenSpec: SÍ se versionan (el gitignore global de Fredo los ignora)
+!openspec/
+
+# Herramientas de agentes, skills, conversaciones y handoffs: nada de esto se sube
+.claude/
+.agents/
+.opencode/
+AGENTS.md
+CLAUDE.md
+handoffs/
+HANDOFF*.md
+*.handoff.md
+conversaciones/
+
+# Node / Electron
+node_modules/
+dist/
+out/
+release/
+.env
+.env.*
+!.env.example
