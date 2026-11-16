@@ -12,7 +12,7 @@ HELIX COVENANT TERMINAL no tiene todavía código. Antes de poder construir el t
 - Soporte de interfaz en español e inglés desde el primer arranque, con detección del idioma del sistema y respaldo a inglés.
 - Instancia única: lanzar la aplicación por segunda vez enfoca la ventana existente.
 - Calidad desde el día uno: lint, formato, tipos estrictos, tests unitarios, un test de humo que arranca la aplicación real, y CI en Windows y Ubuntu.
-- Declarar la aprobación explícita del script de instalación de `electron`, que npm 11 bloquea por defecto (sin ella, un clon nuevo no descarga el binario).
+- Garantizar que `npm ci` deja Electron listo: el paquete 45 ya no trae script de instalación y `electron-vite` no descarga el binario por su cuenta, así que el proyecto declara su propio `postinstall`.
 
 No hay cambios **BREAKING**: el proyecto parte de cero.
 
