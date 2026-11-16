@@ -21,3 +21,7 @@ Material de estudio en `Repos de referencia/` (no versionado). Ver el README de 
 ## Licencia
 
 Apache-2.0. Ver `LICENSE`. Las redistribuciones deben conservar el archivo `NOTICE` con la atribución a FredoCubap.
+
+## Contribuir
+
+Ver [`CONTRIBUTING.md`](CONTRIBUTING.md): ramas, commits, PRs y versionado.
