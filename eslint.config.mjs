@@ -36,6 +36,14 @@ export default tseslint.config(
     ...reactHooks.configs.flat.recommended,
   },
   {
+    files: ['tests/**/*.ts'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    files: ['tests/smoke.test.ts'],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
     files: ['eslint.config.mjs'],
     ...tseslint.configs.disableTypeChecked,
   },
