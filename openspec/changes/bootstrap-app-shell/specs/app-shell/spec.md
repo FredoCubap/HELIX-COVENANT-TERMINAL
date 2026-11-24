@@ -35,6 +35,17 @@ La interfaz SHALL ejecutarse sin acceso directo a las APIs del sistema operativo
 - **WHEN** la interfaz intenta obtener una referencia directa a objetos del proceso principal
 - **THEN** no existe ningún mecanismo que se lo permita
 
+### Requirement: Origen de la interfaz verificado
+La aplicación SHALL cargar en desarrollo únicamente un origen HTTP de loopback y en producción únicamente el archivo renderer empaquetado. SHALL rechazar navegación, redirecciones y mensajes IPC provenientes de cualquier otro origen.
+
+#### Scenario: URL de desarrollo externa
+- **WHEN** `ELECTRON_RENDERER_URL` apunta a un origen que no es HTTP loopback
+- **THEN** la aplicación ignora esa URL y carga el renderer empaquetado
+
+#### Scenario: Navegación o redirección externa
+- **WHEN** el contenido intenta navegar o redirigir a un origen distinto del suyo
+- **THEN** la navegación se cancela y no se abre un navegador externo
+
 ### Requirement: Política de contenido restrictiva
 La interfaz SHALL cargar únicamente recursos propios de la aplicación; no SHALL ejecutar scripts remotos ni scripts incrustados en línea.
 
@@ -58,7 +69,7 @@ La ventana SHALL permanecer siempre en el contenido propio de la aplicación; no
 - **THEN** no se abre ninguna ventana dentro de la aplicación
 
 ### Requirement: Enlaces externos validados
-La aplicación SHALL abrir en el navegador del sistema únicamente URLs con esquema `http` o `https`, y SHALL ignorar cualquier otro esquema.
+La aplicación SHALL abrir en el navegador del sistema únicamente URLs con esquema `http` o `https` mediante el método explícito del contrato IPC, y SHALL ignorar cualquier otro esquema. La navegación y las redirecciones no SHALL abrir URLs externas automáticamente.
 
 #### Scenario: Enlace https
 - **WHEN** el usuario activa un enlace `https://example.com`
