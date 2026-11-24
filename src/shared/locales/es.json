@@ -1,0 +1,7 @@
+{
+  "app.title": "HELIX COVENANT TERMINAL",
+  "error.untrusted_sender": "Emisor no confiable.",
+  "error.invalid_request": "Solicitud no válida.",
+  "error.internal_error": "Error interno.",
+  "info.fetch_failed": "No se pudo obtener la información de la aplicación."
+}
