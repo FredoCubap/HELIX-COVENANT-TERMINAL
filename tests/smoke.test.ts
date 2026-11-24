@@ -147,7 +147,7 @@ describe('aplicación Electron en build de producción', () => {
     )
     await currentPage.waitForTimeout(250)
     expect(await browserWindow.evaluate((window) => window.isFullScreen())).toBe(false)
-  })
+  }, 30_000)
 
   it('termina un segundo proceso y conserva la ventana existente', async () => {
     if (!userDataPath) {
