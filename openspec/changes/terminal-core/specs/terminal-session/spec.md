@@ -65,9 +65,27 @@ Si la interfaz no puede consumir la salida a la velocidad a la que el shell la p
 - **WHEN** un comando produce salida continua mucho más rápida de lo que la interfaz dibuja
 - **THEN** la aplicación pausa la lectura al superar el umbral alto de datos sin confirmar y la reanuda al bajar del umbral bajo
 
+#### Scenario: Confirmación inválida
+- **WHEN** la interfaz confirma una cantidad que no es un entero positivo o que supera lo pendiente de confirmar
+- **THEN** la confirmación se rechaza y el contador de datos pendientes no cambia
+
 #### Scenario: Interfaz responsiva
 - **WHEN** ocurre una salida masiva
 - **THEN** la interfaz sigue respondiendo a la entrada del usuario y la cantidad de datos pendientes nunca supera el tope definido
+
+### Requirement: Entrada acotada
+La aplicación SHALL aceptar como máximo 64 KB por cada escritura hacia el shell.
+
+#### Scenario: Escritura demasiado grande
+- **WHEN** la interfaz envía una escritura de más de 64 KB
+- **THEN** la escritura se rechaza con un error claro y no llega nada al shell
+
+### Requirement: Identificadores de sesión
+Cada sesión SHALL tener un identificador opaco y aleatorio, y cualquier operación sobre un identificador que no corresponda a una sesión viva de la interfaz solicitante SHALL fallar con un error, sin lanzar excepciones ni afectar a otras sesiones.
+
+#### Scenario: Sesión inexistente
+- **WHEN** la interfaz escribe, redimensiona, confirma o cierra con un identificador que no existe
+- **THEN** recibe un error y ninguna sesión existente cambia
 
 ### Requirement: Redimensionado
 Cuando cambie el tamaño visible del terminal, la aplicación SHALL comunicar las nuevas columnas y filas al shell, dentro de los límites de 1 a 500 columnas y de 1 a 200 filas.
@@ -101,6 +119,17 @@ Al cerrar una sesión, y al cerrar la aplicación, SHALL terminarse el shell y t
 #### Scenario: Cerrar la aplicación
 - **WHEN** el usuario cierra la aplicación con varias sesiones abiertas
 - **THEN** no queda ningún shell ni proceso descendiente de la aplicación
+
+### Requirement: Sesiones ligadas a la interfaz
+Las sesiones SHALL pertenecer al contenido de la ventana que las creó; si ese contenido navega, se recarga, se destruye o su proceso se cae, SHALL cerrarse todas sus sesiones y sus procesos descendientes.
+
+#### Scenario: Recarga de la interfaz
+- **WHEN** la interfaz se recarga con varias sesiones abiertas
+- **THEN** todas las sesiones y sus procesos descendientes dejan de existir y la interfaz nueva empieza sin sesiones heredadas
+
+#### Scenario: Caída del proceso de la interfaz
+- **WHEN** el proceso de la interfaz termina de forma inesperada
+- **THEN** todas sus sesiones se cierran sin dejar procesos huérfanos
 
 ### Requirement: Límite de sesiones
 La aplicación SHALL limitar a 16 el número de sesiones simultáneas.

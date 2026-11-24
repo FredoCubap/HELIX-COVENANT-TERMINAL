@@ -14,7 +14,7 @@ La vista SHALL dibujar el terminal con aceleración por GPU y, si el contexto gr
 - **THEN** la vista sigue mostrando el mismo contenido con el dibujado alternativo y la sesión no se interrumpe
 
 ### Requirement: Rendimiento ante salida masiva
-La vista SHALL absorber un volcado de 100 000 líneas en menos de 5 segundos en el equipo de referencia sin dejar de responder a la entrada.
+La vista SHALL absorber un volcado de 100 000 líneas en menos de 5 segundos en el equipo de referencia sin dejar de responder a la entrada. En la integración continua, donde el hardware es más lento, el tiempo SHALL medirse y registrarse con un tope holgado, sin que la medición de rendimiento haga fallar el CI de forma intermitente.
 
 #### Scenario: Volcado grande
 - **WHEN** un comando imprime 100 000 líneas de texto

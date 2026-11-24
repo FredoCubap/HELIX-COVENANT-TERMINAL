@@ -32,6 +32,10 @@ La vista SHALL abrir un enlace del terminal solo con `Ctrl+clic`, solo si su esq
 - **WHEN** un enlace OSC 8 muestra el texto "https://banco.example" pero apunta a otro destino
 - **THEN** antes de abrir se muestra el destino real y se pide confirmación
 
+#### Scenario: Apertura rechazada
+- **WHEN** la apertura externa rechaza un enlace (por ejemplo, de más de 2048 caracteres o con usuario y contraseña)
+- **THEN** la vista muestra un aviso localizado y no queda sin respuesta
+
 #### Scenario: Esquema no permitido
 - **WHEN** un enlace del terminal usa un esquema distinto de `http` o `https`
 - **THEN** no se abre

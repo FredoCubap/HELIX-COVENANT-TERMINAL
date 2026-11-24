@@ -12,9 +12,11 @@ Con la base segura de `bootstrap-app-shell` ya existe una ventana, pero todavía
 - Varias sesiones en pestañas independientes, con atajos que no chocan con los del shell (`Ctrl+Shift+…`).
 - Cierre limpio: cerrar una pestaña o la aplicación termina el shell y sus procesos hijos, sin huérfanos.
 - Seguridad de la salida: portapapeles por secuencias OSC 52 desactivado, enlaces con apertura validada, títulos saneados y pegado protegido contra inyección.
-- Ampliar el contrato IPC con eventos del proceso principal hacia la interfaz (datos de salida, fin de sesión).
+- Ampliar el contrato IPC con eventos del proceso principal hacia la interfaz (datos de salida, fin de sesión), con errores específicos y límites numéricos validados.
+- Atar cada sesión al ciclo de vida de la interfaz: recargar, navegar o perder el contenido que la creó cierra sus sesiones, sin dejar procesos huérfanos.
+- Quitar el menú de aplicación por defecto de Electron: sus atajos (`Ctrl+R`, `Ctrl+W`, `Ctrl+Shift+I`) chocarían con el shell, recargarían la interfaz y abrirían DevTools.
 
-**Dependencia:** este change se implementa **después** de `bootstrap-app-shell` y de archivarlo, porque amplía su capability `ipc-contract`.
+**Dependencia:** amplía las capabilities `ipc-contract` y `app-shell` de `bootstrap-app-shell`, ya archivado el 2026-11-24 (sus specs principales existen en `openspec/specs/`).
 
 ## Capabilities
 
@@ -26,12 +28,13 @@ Con la base segura de `bootstrap-app-shell` ya existe una ventana, pero todavía
 
 ### Modified Capabilities
 
-- `ipc-contract`: se añade la emisión de eventos desde el proceso principal hacia la interfaz.
+- `ipc-contract`: se añade la emisión de eventos desde el proceso principal hacia la interfaz, sin exponer objetos de Electron, y errores específicos.
+- `app-shell`: se quita el menú de aplicación por defecto y con él sus atajos de recarga, cierre de ventana y DevTools.
 
 ## Impact
 
 - **Código nuevo:** gestor de sesiones y resolución de shells en el proceso principal; vista de terminal y pestañas en la interfaz; ampliación del contrato compartido y del preload.
-- **Dependencias nuevas:** `node-pty` 1.1.0 (nativo), `@xterm/xterm` 6.0.0, `@xterm/addon-fit`, `@xterm/addon-webgl` 0.19.0, un addon de Unicode y `@xterm/headless` solo para tests. Versiones exactas al implementar.
+- **Dependencias nuevas:** `node-pty` 1.1.0 (nativo), `@xterm/xterm` 6.0.0, `@xterm/addon-fit`, `@xterm/addon-webgl` 0.19.0, `@xterm/addon-web-links`, un addon de Unicode y `@xterm/headless` solo para tests. Versiones exactas al implementar; hay que verificar la compatibilidad entre xterm 6.0.0 y sus addons, y que `node-pty` queda como módulo externo del bundle del proceso principal.
 - **CI:** en Ubuntu hay que instalar el toolchain C++ (`python3`, `make`, `g++`), porque `node-pty` no publica prebuilds para Linux (hallazgo del spike S1); en Windows basta el prebuild `win32-x64`, verificado funcionando en Electron 45.
 - **npm:** aprobar el script de instalación de `node-pty` con `npm install-scripts approve`.
 - Los tests ejecutan shells reales: solo con comandos inocuos y fijos, en un directorio temporal.
