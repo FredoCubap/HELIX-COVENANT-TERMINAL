@@ -549,7 +549,38 @@ describe('SessionManager: cierre escalonado', () => {
     expect(ptys.map((pty) => pty.killed)).toEqual([1, 1, 1])
     await vi.advanceTimersByTimeAsync(GRACE_MS - 1)
     expect(finished).toBe(false)
-    await vi.advanceTimersByTimeAsync(2)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(finished).toBe(true)
+  })
+
+  it('tras forzar, espera a que los procesos desaparezcan de verdad', async () => {
+    const { manager, processControl } = managerWithControl([901])
+    let finished = false
+    manager.create({ owner, cols: 80, rows: 24 })
+
+    void manager.closeAll().then(() => {
+      finished = true
+    })
+    await vi.advanceTimersByTimeAsync(GRACE_MS + 200)
+    expect(processControl.forceKill).toHaveBeenCalledOnce()
+    expect(finished).toBe(false)
+
+    processControl.alive.delete(901)
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(finished).toBe(true)
+  })
+
+  it('no espera para siempre a un proceso que no muere', async () => {
+    const { manager } = managerWithControl([902])
+    let finished = false
+    manager.create({ owner, cols: 80, rows: 24 })
+
+    void manager.closeAll().then(() => {
+      finished = true
+    })
+    await vi.advanceTimersByTimeAsync(GRACE_MS + 2000)
+
     expect(finished).toBe(true)
   })
 })

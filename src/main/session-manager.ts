@@ -4,6 +4,8 @@ import type { ProcessControl } from './process-control'
 import { chooseShell, type ShellResolution } from './shells'
 
 export const CLOSE_GRACE_MS = 2000
+/** Tope de espera a que los procesos desaparezcan tras la terminación forzada. */
+const FORCE_WAIT_MS = 1000
 export const MAX_SESSIONS = 16
 export const MAX_COLS = 500
 export const MAX_ROWS = 200
@@ -237,12 +239,27 @@ export class SessionManager {
         clearTimeout(deadline)
         clearInterval(poll)
         exitSubscription.dispose()
-        if (force) {
-          this.safely(() => {
-            processControl.forceKill(pty.pid, !shellExited, descendants)
-          }, undefined)
+        if (!force) {
+          resolve()
+          return
         }
-        resolve()
+
+        // La señal no mata al instante: se espera (con tope) a que desaparezcan de verdad.
+        const survivors = [...(shellExited ? [] : [pty.pid]), ...descendants]
+        this.safely(() => {
+          processControl.forceKill(pty.pid, !shellExited, descendants)
+        }, undefined)
+        const giveUp = setTimeout(() => {
+          clearInterval(check)
+          resolve()
+        }, FORCE_WAIT_MS)
+        const check = setInterval(() => {
+          if (!survivors.some((pid) => processControl.isAlive(pid))) {
+            clearTimeout(giveUp)
+            clearInterval(check)
+            resolve()
+          }
+        }, 25)
       }
       const deadline = setTimeout(() => {
         finish(true)

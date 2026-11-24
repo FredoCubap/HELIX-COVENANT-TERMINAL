@@ -126,7 +126,7 @@ describe.skipIf(shell === null)('cierre sin procesos huérfanos con un shell rea
     await manager.closeAll()
 
     await waitUntil(() => !control.isAlive(childPid), 10_000, 'el hijo sigue vivo tras cerrar')
-    expect(control.isAlive(shellPid)).toBe(false)
+    await waitUntil(() => !control.isAlive(shellPid), 10_000, 'el shell sigue vivo')
     expect(manager.count).toBe(0)
   }, 60_000)
 
@@ -144,7 +144,11 @@ describe.skipIf(shell === null)('cierre sin procesos huérfanos con un shell rea
       10_000,
       'quedan hijos vivos tras closeAll',
     )
-    expect([first.shellPid, second.shellPid].some((pid) => control.isAlive(pid))).toBe(false)
+    await waitUntil(
+      () => ![first.shellPid, second.shellPid].some((pid) => control.isAlive(pid)),
+      10_000,
+      'quedan shells vivos tras closeAll',
+    )
     expect(manager.count).toBe(0)
   }, 90_000)
 
@@ -166,7 +170,7 @@ describe.skipIf(shell === null)('cierre sin procesos huérfanos con un shell rea
       await manager.closeAll()
 
       await waitUntil(() => !control.isAlive(childPid), 10_000, 'el hijo con nohup sigue vivo')
-      expect(control.isAlive(shellPid)).toBe(false)
+      await waitUntil(() => !control.isAlive(shellPid), 10_000, 'el shell sigue vivo')
     },
     60_000,
   )
