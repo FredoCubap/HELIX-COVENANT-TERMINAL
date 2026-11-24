@@ -97,6 +97,18 @@ function resolveLinux(env: ShellEnv, fs: ShellFileSystem): ShellResolution {
   return { shells, defaultId: defaultId ?? null }
 }
 
+/**
+ * Elección acotada: solo vale un identificador exacto de la lista detectada
+ * (o el predeterminado si no se pide ninguno). Nunca rutas ni argumentos.
+ */
+export function chooseShell(resolution: ShellResolution, requestedId: unknown): ShellInfo | null {
+  const id = requestedId === undefined ? resolution.defaultId : requestedId
+  if (typeof id !== 'string') {
+    return null
+  }
+  return resolution.shells.find((shell) => shell.id === id) ?? null
+}
+
 export function resolveShells(
   env: ShellEnv,
   fs: ShellFileSystem,
