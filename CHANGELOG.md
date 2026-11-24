@@ -12,3 +12,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Licencia Apache-2.0 y archivo `NOTICE` con la atribución a FredoCubap.
 - Specs de OpenSpec de los changes `bootstrap-app-shell` y `terminal-core`.
 - Flujo de contribución (`CONTRIBUTING.md`) y plantilla de PR.
+
+### Changed
+
+- Se quita el menú de aplicación de Electron: `Ctrl+R`, `Ctrl+W` y `Ctrl+Shift+I` ya no recargan, cierran la ventana ni abren DevTools.

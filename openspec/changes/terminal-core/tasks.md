@@ -2,7 +2,7 @@
 
 ## 1. Menú de aplicación (`app-shell`)
 
-- [ ] 1.1 Quitar el menú de aplicación por defecto con `Menu.setApplicationMenu(null)` antes de crear la ventana; verificar con el test de humo, por comportamiento, que `Ctrl+R` no recarga (un marcador en `window` sobrevive), que `Ctrl+W` no cierra la ventana y que `Ctrl+Shift+I` no abre las herramientas de desarrollo
+- [x] 1.1 Quitar el menú de aplicación por defecto con `Menu.setApplicationMenu(null)` antes de crear la ventana; verificar con el test de humo, por comportamiento, que `Ctrl+R` no recarga (un marcador en `window` sobrevive), que `Ctrl+W` no cierra la ventana y que `Ctrl+Shift+I` no abre las herramientas de desarrollo
 
 ## 2. Dependencias y toolchain
 

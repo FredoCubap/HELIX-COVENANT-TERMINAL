@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, session, shell } from 'electron'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createIpcHandlers } from './ipc'
@@ -144,6 +144,8 @@ if (!hasSingleInstanceLock) {
   }
 
   void app.whenReady().then(() => {
+    // Sin menú: el de Electron asigna Ctrl+R, Ctrl+W y Ctrl+Shift+I, que deben llegar al shell.
+    Menu.setApplicationMenu(null)
     setLocale(resolveLocale(undefined, app.getLocale()))
     session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
       callback(false)
