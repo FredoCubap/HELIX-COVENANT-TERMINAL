@@ -12,7 +12,7 @@
 
 ## 3. Resolución de shells (`terminal-session`)
 
-- [ ] 3.1 Implementar `resolveShells(env, fs, platform)` con las reglas de Windows y Linux; verificar con tests Vitest de los cuatro escenarios (pwsh, sin pwsh, `$SHELL` válido, `$SHELL` inválido)
+- [x] 3.1 Implementar `resolveShells(env, fs, platform)` con las reglas de Windows y Linux; verificar con tests Vitest de los cuatro escenarios (pwsh, sin pwsh, `$SHELL` válido, `$SHELL` inválido)
 - [ ] 3.2 Implementar la elección acotada por identificador y el rechazo de rutas arbitrarias; verificar con un test que una ruta no detectada no ejecuta ningún proceso
 
 ## 4. Gestor de sesiones
