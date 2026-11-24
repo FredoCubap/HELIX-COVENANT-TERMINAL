@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
+import type { ProcessControl } from './process-control'
 import { chooseShell, type ShellResolution } from './shells'
 
+export const CLOSE_GRACE_MS = 2000
 export const MAX_SESSIONS = 16
 export const MAX_COLS = 500
 export const MAX_ROWS = 200
@@ -23,6 +25,7 @@ export type CreateResult =
 
 /** Lo mínimo que el gestor necesita de un PTY; `IPty` de node-pty lo cumple tal cual. */
 export interface PtyProcess {
+  readonly pid: number
   onData(listener: (data: string) => void): { dispose(): void }
   onExit(listener: (event: { exitCode: number; signal?: number }) => void): { dispose(): void }
   write(data: string): void
@@ -52,10 +55,15 @@ export interface SessionManagerDependencies {
   readonly homeDirectory: string
   isDirectory(path: string): boolean
   readonly events: SessionEvents
+  readonly processControl: ProcessControl
+  /** Plazo entre el cierre cortés y la terminación forzada. */
+  readonly closeGraceMs?: number
   logError(context: string, error: unknown): void
 }
 
 export interface CreateOptions {
+  /** Contenido de la interfaz que crea la sesión; al perderse, la sesión se cierra. */
+  readonly owner: object
   readonly shellId?: unknown
   readonly cwd?: unknown
   readonly cols: number
@@ -63,6 +71,7 @@ export interface CreateOptions {
 }
 
 interface Session {
+  readonly owner: object
   readonly pty: PtyProcess
   readonly subscriptions: readonly { dispose(): void }[]
 }
@@ -102,6 +111,7 @@ function isValidSize(cols: unknown, rows: unknown): boolean {
 
 export class SessionManager {
   private readonly sessions = new Map<string, Session>()
+  private readonly terminations = new Set<Promise<void>>()
 
   constructor(private readonly dependencies: SessionManagerDependencies) {}
 
@@ -151,7 +161,7 @@ export class SessionManager {
           events.exit(id, exitCode)
         }),
       ]
-      this.sessions.set(id, { pty, subscriptions })
+      this.sessions.set(id, { owner: options.owner, pty, subscriptions })
     } catch (error) {
       this.dependencies.logError('No se pudo crear la sesión de shell.', error)
       return { ok: false, code: 'internal_error' }
@@ -192,8 +202,75 @@ export class SessionManager {
       return { ok: false, code: 'session_not_found' }
     }
     this.release(id)
-    session.pty.kill()
+    this.terminate(session.pty)
     return { ok: true }
+  }
+
+  /** Cierra todas las sesiones de un contenido que navega, se recarga, se destruye o se cae. */
+  closeOwnedBy(owner: object): number {
+    const owned = [...this.sessions].filter(([, session]) => session.owner === owner)
+    owned.forEach(([id]) => this.close(id))
+    return owned.length
+  }
+
+  /** Cierra todas las sesiones y espera a que no quede ningún proceso (al salir de la aplicación). */
+  async closeAll(): Promise<void> {
+    ;[...this.sessions.keys()].forEach((id) => this.close(id))
+    await Promise.all([...this.terminations])
+  }
+
+  /**
+   * Cierre escalonado: cortés (señal de cierre al shell), espera y terminación forzada.
+   * Los descendientes se capturan antes porque, si el shell muere primero, pasan a init
+   * y ya no cuelgan de él. Termina en cuanto el shell salió y no queda ningún descendiente.
+   */
+  private terminate(pty: PtyProcess): void {
+    const { processControl } = this.dependencies
+    const descendants = this.safely(() => processControl.listDescendants(pty.pid), [])
+    let shellExited = false
+
+    const termination = new Promise<void>((resolve) => {
+      const exitSubscription = pty.onExit(() => {
+        shellExited = true
+      })
+      const finish = (force: boolean): void => {
+        clearTimeout(deadline)
+        clearInterval(poll)
+        exitSubscription.dispose()
+        if (force) {
+          this.safely(() => {
+            processControl.forceKill(pty.pid, !shellExited, descendants)
+          }, undefined)
+        }
+        resolve()
+      }
+      const deadline = setTimeout(() => {
+        finish(true)
+      }, this.dependencies.closeGraceMs ?? CLOSE_GRACE_MS)
+      const poll = setInterval(() => {
+        if (shellExited && !descendants.some((pid) => processControl.isAlive(pid))) {
+          finish(false)
+        }
+      }, 25)
+
+      try {
+        pty.kill()
+      } catch (error) {
+        this.dependencies.logError('No se pudo cerrar la sesión de shell con cortesía.', error)
+      }
+    })
+
+    this.terminations.add(termination)
+    void termination.finally(() => this.terminations.delete(termination))
+  }
+
+  private safely<T>(action: () => T, fallback: T): T {
+    try {
+      return action()
+    } catch (error) {
+      this.dependencies.logError('Falló el control de procesos de una sesión.', error)
+      return fallback
+    }
   }
 
   /** Libera la sesión: deja de escuchar al PTY y libera su cupo. No notifica el fin. */

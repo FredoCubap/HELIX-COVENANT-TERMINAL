@@ -8,6 +8,8 @@
     "./**/*.ts",
     "../src/main/ipc.ts",
     "../src/main/security.ts",
+    "../src/main/process-control.ts",
+    "../src/main/session-lifecycle.ts",
     "../src/main/session-manager.ts",
     "../src/main/shells.ts",
     "../src/renderer/src/global.d.ts",
