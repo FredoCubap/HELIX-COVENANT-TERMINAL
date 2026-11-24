@@ -6,9 +6,9 @@
 
 ## 2. Dependencias y toolchain
 
-- [ ] 2.1 Añadir `node-pty`, `@xterm/xterm`, addons de ajuste, WebGL, enlaces (`@xterm/addon-web-links`) y Unicode, y `@xterm/headless` (dev) con versiones exactas, consultadas con Fredo; verificar que `npm ci` en Windows instala `node-pty` desde su prebuild, que `npm run typecheck` pasa, que xterm 6.0.0 y sus addons son compatibles y que `npm run build` deja `node-pty` como módulo externo del bundle de main
-- [ ] 2.2 Aprobar el script de instalación de `node-pty` con `npm install-scripts approve node-pty`; verificar que un `npm ci` en carpeta limpia deja el módulo nativo utilizable
-- [ ] 2.3 Instalar `build-essential` y `python3` en el job de Ubuntu del CI; verificar que `npm ci` compila `node-pty` y el job queda verde
+- [x] 2.1 Añadir `node-pty`, `@xterm/xterm`, addons de ajuste, WebGL, enlaces (`@xterm/addon-web-links`) y Unicode, y `@xterm/headless` (dev) con versiones exactas, consultadas con Fredo; verificar que `npm ci` en Windows instala `node-pty` desde su prebuild, que `npm run typecheck` pasa, que xterm 6.0.0 y sus addons son compatibles y que `npm run build` deja `node-pty` como módulo externo del bundle de main
+- [x] 2.2 Aprobar el script de instalación de `node-pty` con `npm install-scripts approve node-pty`; verificar que un `npm ci` en carpeta limpia deja el módulo nativo utilizable
+- [x] 2.3 Instalar `build-essential` y `python3` en el job de Ubuntu del CI; verificar que `npm ci` compila `node-pty` y el job queda verde
 
 ## 3. Resolución de shells (`terminal-session`)
 
