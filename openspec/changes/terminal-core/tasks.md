@@ -13,13 +13,13 @@
 ## 3. Resolución de shells (`terminal-session`)
 
 - [x] 3.1 Implementar `resolveShells(env, fs, platform)` con las reglas de Windows y Linux; verificar con tests Vitest de los cuatro escenarios (pwsh, sin pwsh, `$SHELL` válido, `$SHELL` inválido)
-- [ ] 3.2 Implementar la elección acotada por identificador y el rechazo de rutas arbitrarias; verificar con un test que una ruta no detectada no ejecuta ningún proceso
+- [x] 3.2 Implementar la elección acotada por identificador y el rechazo de rutas arbitrarias; verificar con un test que una ruta no detectada no ejecuta ningún proceso
 
 ## 4. Gestor de sesiones
 
-- [ ] 4.1 Implementar `SessionManager` (crear, escribir, redimensionar, cerrar) con directorio inicial, validación de directorio existente y límites de dimensiones y de 16 sesiones; con identificadores de sesión opacos y aleatorios y error (sin excepción) ante un id inexistente; verificar con tests de los escenarios de dimensiones fuera de rango, directorio inexistente, límite alcanzado y sesión inexistente
-- [ ] 4.2 Construir el entorno del hijo (`TERM`, `COLORTERM`, sin variables internas); verificar con un test que un shell real imprime `TERM=xterm-256color` y no tiene `ELECTRON_RUN_AS_NODE`
-- [ ] 4.3 Notificar el fin de sesión con su código de salida y liberar recursos; verificar con shells reales que terminan con código 0 y con código distinto de 0
+- [x] 4.1 Implementar `SessionManager` (crear, escribir, redimensionar, cerrar) con directorio inicial, validación de directorio existente y límites de dimensiones y de 16 sesiones; con identificadores de sesión opacos y aleatorios y error (sin excepción) ante un id inexistente; verificar con tests de los escenarios de dimensiones fuera de rango, directorio inexistente, límite alcanzado y sesión inexistente
+- [x] 4.2 Construir el entorno del hijo (`TERM`, `COLORTERM`, sin variables internas); verificar con un test que un shell real imprime `TERM=xterm-256color` y no tiene `ELECTRON_RUN_AS_NODE`
+- [x] 4.3 Notificar el fin de sesión con su código de salida y liberar recursos; verificar con shells reales que terminan con código 0 y con código distinto de 0
 - [ ] 4.4 Cerrar sin huérfanos con cierre escalonado (cortés, espera, forzado) y cierre de todas las sesiones al salir; verificar con un test real por plataforma que un proceso hijo de larga duración deja de existir tras cerrar
 - [ ] 4.5 Atar cada sesión al `webContents` que la creó y cerrarla al navegar, recargar, destruirse o caer el proceso de la interfaz (`did-start-navigation`, `render-process-gone`, `destroyed`); verificar con tests reales que, tras recargar con un proceso hijo vivo, no queda ningún proceso y que la interfaz nueva no hereda sesiones
 
