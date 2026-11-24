@@ -149,6 +149,44 @@ describe('aplicación Electron en build de producción', () => {
     expect(await browserWindow.evaluate((window) => window.isFullScreen())).toBe(false)
   }, 30_000)
 
+  it('no tiene menú de aplicación ni sus atajos de recarga, cierre y DevTools', async () => {
+    const currentPage = getPage()
+    const runningApplication = getApplication()
+    const browserWindow = await runningApplication.browserWindow(currentPage)
+    const pressChord = async (keyCode: string, modifiers: ('control' | 'shift')[]) => {
+      await browserWindow.evaluate(
+        (window, chord) => {
+          window.webContents.sendInputEvent({ type: 'keyDown', ...chord })
+          window.webContents.sendInputEvent({ type: 'keyUp', ...chord })
+        },
+        { keyCode, modifiers },
+      )
+      await currentPage.waitForTimeout(500)
+    }
+
+    await currentPage.evaluate(() => {
+      ;(window as Window & { __helixMarker?: boolean }).__helixMarker = true
+    })
+    await browserWindow.evaluate((window) => window.focus())
+
+    await pressChord('R', ['control'])
+    const markerSurvives = await currentPage.evaluate(
+      () => (window as Window & { __helixMarker?: boolean }).__helixMarker,
+    )
+    expect(markerSurvives).toBe(true)
+
+    await pressChord('I', ['control', 'shift'])
+    expect(await browserWindow.evaluate((window) => window.webContents.isDevToolsOpened())).toBe(
+      false,
+    )
+
+    await pressChord('W', ['control'])
+    expect(await browserWindow.evaluate((window) => window.isDestroyed())).toBe(false)
+    expect(runningApplication.windows()).toHaveLength(1)
+
+    expect(await runningApplication.evaluate(({ Menu }) => Menu.getApplicationMenu())).toBeNull()
+  }, 30_000)
+
   it('termina un segundo proceso y conserva la ventana existente', async () => {
     if (!userDataPath) {
       throw new Error('No se creó el directorio temporal de la aplicación.')
