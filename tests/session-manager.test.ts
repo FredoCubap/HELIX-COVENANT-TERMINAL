@@ -1,5 +1,7 @@
+import { EventEmitter } from 'node:events'
 import { isAbsolute } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { bindSessionLifecycle } from '../src/main/session-lifecycle'
 import {
   buildChildEnv,
   MAX_SESSIONS,
@@ -12,9 +14,12 @@ import {
 import { chooseShell, type ShellResolution } from '../src/main/shells'
 
 class FakePty implements PtyProcess {
+  private static nextPid = 1000
+  readonly pid = (FakePty.nextPid += 1)
   readonly writes: string[] = []
   readonly resizes: [number, number][] = []
   killed = 0
+  killError: Error | null = null
   private dataListeners: ((data: string) => void)[] = []
   private exitListeners: ((event: { exitCode: number }) => void)[] = []
 
@@ -46,6 +51,9 @@ class FakePty implements PtyProcess {
 
   kill(): void {
     this.killed += 1
+    if (this.killError !== null) {
+      throw this.killError
+    }
   }
 
   emitData(data: string): void {
@@ -70,7 +78,22 @@ const shells: ShellResolution = {
 }
 const existingDirectory = isAbsolute('/tmp') ? '/tmp' : 'C:\\Windows'
 
+const owner = {}
+const GRACE_MS = 1000
+
+/** Control de procesos simulado: `alive` es el conjunto de PIDs que siguen vivos. */
+function fakeProcessControl(descendants: number[] = []) {
+  const alive = new Set(descendants)
+  return {
+    alive,
+    listDescendants: vi.fn((): number[] => [...descendants]),
+    isAlive: vi.fn((pid: number) => alive.has(pid)),
+    forceKill: vi.fn(),
+  }
+}
+
 function makeManager(overrides: { env?: Record<string, string | undefined> } = {}) {
+  const processControl = fakeProcessControl()
   const ptys: FakePty[] = []
   const spawnCalls: { file: string; args: string[]; options: PtySpawnOptions }[] = []
   const spawn: PtySpawn = (file, args, options) => {
@@ -88,9 +111,11 @@ function makeManager(overrides: { env?: Record<string, string | undefined> } = {
     homeDirectory: '/home/fredo',
     isDirectory: (path) => path === existingDirectory,
     events,
+    processControl,
+    closeGraceMs: GRACE_MS,
     logError,
   })
-  return { manager, ptys, spawnCalls, events, logError }
+  return { manager, ptys, spawnCalls, events, logError, processControl }
 }
 
 function createdId(result: ReturnType<SessionManager['create']>): string {
@@ -131,7 +156,7 @@ describe('SessionManager: creación', () => {
   it('crea una sesión con el shell detectado, su directorio y dimensiones', () => {
     const { manager, spawnCalls } = makeManager()
 
-    const result = manager.create({ shellId: 'sh', cols: 100, rows: 30 })
+    const result = manager.create({ owner, shellId: 'sh', cols: 100, rows: 30 })
 
     expect(result.ok).toBe(true)
     expect(spawnCalls).toHaveLength(1)
@@ -145,7 +170,7 @@ describe('SessionManager: creación', () => {
   it('usa el shell predeterminado si no se indica ninguno', () => {
     const { manager, spawnCalls } = makeManager()
 
-    manager.create({ cols: 80, rows: 24 })
+    manager.create({ owner, cols: 80, rows: 24 })
 
     expect(spawnCalls[0]?.file).toBe('/bin/bash')
   })
@@ -153,7 +178,7 @@ describe('SessionManager: creación', () => {
   it('usa el directorio indicado si existe', () => {
     const { manager, spawnCalls } = makeManager()
 
-    manager.create({ cwd: existingDirectory, cols: 80, rows: 24 })
+    manager.create({ owner, cwd: existingDirectory, cols: 80, rows: 24 })
 
     expect(spawnCalls[0]?.options.cwd).toBe(existingDirectory)
   })
@@ -162,7 +187,7 @@ describe('SessionManager: creación', () => {
     const { manager, spawnCalls } = makeManager()
 
     for (const cwd of ['/no/existe', 'relativo', '', 42, null, {}]) {
-      expect(manager.create({ cwd, cols: 80, rows: 24 })).toEqual({
+      expect(manager.create({ owner, cwd, cols: 80, rows: 24 })).toEqual({
         ok: false,
         code: 'invalid_directory',
       })
@@ -175,7 +200,7 @@ describe('SessionManager: creación', () => {
     const { manager, spawnCalls } = makeManager()
 
     for (const shellId of ['/bin/bash', 'C:\\Windows\\System32\\cmd.exe', 'bash -c id', '../sh']) {
-      expect(manager.create({ shellId, cols: 80, rows: 24 })).toEqual({
+      expect(manager.create({ owner, shellId, cols: 80, rows: 24 })).toEqual({
         ok: false,
         code: 'shell_not_found',
       })
@@ -196,24 +221,27 @@ describe('SessionManager: creación', () => {
   ])('rechaza dimensiones fuera de rango (%s x %s)', (cols, rows) => {
     const { manager, spawnCalls } = makeManager()
 
-    expect(manager.create({ cols, rows })).toEqual({ ok: false, code: 'invalid_request' })
+    expect(manager.create({ owner, cols, rows })).toEqual({ ok: false, code: 'invalid_request' })
     expect(spawnCalls).toHaveLength(0)
   })
 
   it('acepta las dimensiones límite', () => {
     const { manager } = makeManager()
 
-    expect(manager.create({ cols: 1, rows: 1 }).ok).toBe(true)
-    expect(manager.create({ cols: 500, rows: 200 }).ok).toBe(true)
+    expect(manager.create({ owner, cols: 1, rows: 1 }).ok).toBe(true)
+    expect(manager.create({ owner, cols: 500, rows: 200 }).ok).toBe(true)
   })
 
   it('rechaza la sesión 17 y no afecta a las existentes', () => {
     const { manager, ptys } = makeManager()
     for (let index = 0; index < MAX_SESSIONS; index += 1) {
-      expect(manager.create({ cols: 80, rows: 24 }).ok).toBe(true)
+      expect(manager.create({ owner, cols: 80, rows: 24 }).ok).toBe(true)
     }
 
-    expect(manager.create({ cols: 80, rows: 24 })).toEqual({ ok: false, code: 'session_limit' })
+    expect(manager.create({ owner, cols: 80, rows: 24 })).toEqual({
+      ok: false,
+      code: 'session_limit',
+    })
     expect(manager.count).toBe(MAX_SESSIONS)
     expect(ptys).toHaveLength(MAX_SESSIONS)
     expect(ptys.every((pty) => pty.killed === 0)).toBe(true)
@@ -230,10 +258,11 @@ describe('SessionManager: creación', () => {
       homeDirectory: '/home/fredo',
       isDirectory: () => true,
       events: { data: vi.fn(), exit: vi.fn() },
+      processControl: fakeProcessControl(),
       logError,
     })
 
-    const result = manager.create({ cols: 80, rows: 24 })
+    const result = manager.create({ owner, cols: 80, rows: 24 })
 
     expect(result).toEqual({ ok: false, code: 'internal_error' })
     expect(JSON.stringify(result)).not.toContain('secreto')
@@ -244,7 +273,9 @@ describe('SessionManager: creación', () => {
   it('genera identificadores opacos, aleatorios y distintos', () => {
     const { manager } = makeManager()
 
-    const ids = Array.from({ length: 5 }, () => createdId(manager.create({ cols: 80, rows: 24 })))
+    const ids = Array.from({ length: 5 }, () =>
+      createdId(manager.create({ owner, cols: 80, rows: 24 })),
+    )
 
     expect(new Set(ids).size).toBe(5)
     ids.forEach((id) => {
@@ -256,7 +287,7 @@ describe('SessionManager: creación', () => {
 describe('SessionManager: entrada, redimensionado y cierre', () => {
   it('escribe en el orden recibido', () => {
     const { manager, ptys } = makeManager()
-    const id = createdId(manager.create({ cols: 80, rows: 24 }))
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
 
     manager.write(id, 'ls')
     manager.write(id, '\r')
@@ -266,7 +297,7 @@ describe('SessionManager: entrada, redimensionado y cierre', () => {
 
   it('rechaza una escritura de más de 64 KB sin pasarla al shell', () => {
     const { manager, ptys } = makeManager()
-    const id = createdId(manager.create({ cols: 80, rows: 24 }))
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
 
     expect(manager.write(id, 'a'.repeat(MAX_WRITE_BYTES))).toEqual({ ok: true })
     expect(manager.write(id, 'a'.repeat(MAX_WRITE_BYTES + 1))).toEqual({
@@ -283,7 +314,7 @@ describe('SessionManager: entrada, redimensionado y cierre', () => {
 
   it('rechaza una escritura que no es texto', () => {
     const { manager, ptys } = makeManager()
-    const id = createdId(manager.create({ cols: 80, rows: 24 }))
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
 
     expect(manager.write(id, 42)).toEqual({ ok: false, code: 'invalid_request' })
     expect(manager.write(id, null)).toEqual({ ok: false, code: 'invalid_request' })
@@ -292,7 +323,7 @@ describe('SessionManager: entrada, redimensionado y cierre', () => {
 
   it('redimensiona dentro de los límites y rechaza lo que queda fuera', () => {
     const { manager, ptys } = makeManager()
-    const id = createdId(manager.create({ cols: 80, rows: 24 }))
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
 
     expect(manager.resize(id, 120, 40)).toEqual({ ok: true })
     expect(manager.resize(id, 501, 40)).toEqual({ ok: false, code: 'invalid_request' })
@@ -302,7 +333,7 @@ describe('SessionManager: entrada, redimensionado y cierre', () => {
 
   it('devuelve un error, sin lanzar, ante un identificador inexistente', () => {
     const { manager } = makeManager()
-    const id = createdId(manager.create({ cols: 80, rows: 24 }))
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
     const notFound = { ok: false, code: 'session_not_found' }
 
     for (const unknown of ['no-existe', '', '__proto__', 'constructor', `${id}x`]) {
@@ -315,7 +346,7 @@ describe('SessionManager: entrada, redimensionado y cierre', () => {
 
   it('cierra la sesión, libera su cupo y no notifica fin', () => {
     const { manager, ptys, events } = makeManager()
-    const id = createdId(manager.create({ cols: 80, rows: 24 }))
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
 
     expect(manager.close(id)).toEqual({ ok: true })
 
@@ -330,8 +361,8 @@ describe('SessionManager: entrada, redimensionado y cierre', () => {
 describe('SessionManager: salida y fin de sesión', () => {
   it('reenvía la salida con el identificador de su sesión', () => {
     const { manager, ptys, events } = makeManager()
-    const first = createdId(manager.create({ cols: 80, rows: 24 }))
-    const second = createdId(manager.create({ cols: 80, rows: 24 }))
+    const first = createdId(manager.create({ owner, cols: 80, rows: 24 }))
+    const second = createdId(manager.create({ owner, cols: 80, rows: 24 }))
 
     ptys[1]?.emitData('hola áéíóú ñ')
 
@@ -342,7 +373,7 @@ describe('SessionManager: salida y fin de sesión', () => {
 
   it.each([0, 3, 130])('notifica el fin con el código %s y libera la sesión', (exitCode) => {
     const { manager, ptys, events } = makeManager()
-    const id = createdId(manager.create({ cols: 80, rows: 24 }))
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
 
     ptys[0]?.emitExit(exitCode)
 
@@ -354,18 +385,18 @@ describe('SessionManager: salida y fin de sesión', () => {
   it('libera el cupo: tras terminar una sesión se puede crear otra', () => {
     const { manager, ptys } = makeManager()
     for (let index = 0; index < MAX_SESSIONS; index += 1) {
-      manager.create({ cols: 80, rows: 24 })
+      manager.create({ owner, cols: 80, rows: 24 })
     }
-    expect(manager.create({ cols: 80, rows: 24 }).ok).toBe(false)
+    expect(manager.create({ owner, cols: 80, rows: 24 }).ok).toBe(false)
 
     ptys[0]?.emitExit(0)
 
-    expect(manager.create({ cols: 80, rows: 24 }).ok).toBe(true)
+    expect(manager.create({ owner, cols: 80, rows: 24 }).ok).toBe(true)
   })
 
   it('deja de reenviar salida y de notificar tras terminar', () => {
     const { manager, ptys, events } = makeManager()
-    manager.create({ cols: 80, rows: 24 })
+    manager.create({ owner, cols: 80, rows: 24 })
 
     ptys[0]?.emitExit(0)
     ptys[0]?.emitData('tarde')
@@ -396,5 +427,243 @@ describe('buildChildEnv', () => {
     const env = buildChildEnv({ HOME: '/home/fredo', LANG: 'es_ES.UTF-8', NODE_OPTIONS: '--x' })
 
     expect(env).toMatchObject({ HOME: '/home/fredo', LANG: 'es_ES.UTF-8', NODE_OPTIONS: '--x' })
+  })
+})
+
+describe('SessionManager: cierre escalonado', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function managerWithControl(descendants: number[] = []) {
+    vi.useFakeTimers()
+    const ptys: FakePty[] = []
+    const processControl = fakeProcessControl(descendants)
+    const logError = vi.fn()
+    const manager = new SessionManager({
+      shells,
+      spawn: () => {
+        const pty = new FakePty()
+        ptys.push(pty)
+        return pty
+      },
+      env: {},
+      homeDirectory: '/home/fredo',
+      isDirectory: () => true,
+      events: { data: vi.fn(), exit: vi.fn() },
+      processControl,
+      closeGraceMs: GRACE_MS,
+      logError,
+    })
+    return { manager, ptys, processControl, logError }
+  }
+
+  it('cierra con cortesía y no fuerza nada si el shell sale y no quedan descendientes', async () => {
+    const { manager, ptys, processControl } = managerWithControl()
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
+
+    manager.close(id)
+    expect(ptys[0]?.killed).toBe(1)
+    expect(processControl.listDescendants).toHaveBeenCalledWith(ptys[0]?.pid)
+
+    ptys[0]?.emitExit(0)
+    await vi.advanceTimersByTimeAsync(100)
+    await manager.closeAll()
+
+    expect(processControl.forceKill).not.toHaveBeenCalled()
+  })
+
+  it('fuerza la terminación del shell que ignora el cierre cortés', async () => {
+    const { manager, ptys, processControl } = managerWithControl([501, 502])
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
+
+    manager.close(id)
+    await vi.advanceTimersByTimeAsync(GRACE_MS - 1)
+    expect(processControl.forceKill).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(2)
+
+    expect(processControl.forceKill).toHaveBeenCalledExactlyOnceWith(ptys[0]?.pid, true, [501, 502])
+  })
+
+  it('fuerza los descendientes que sobreviven aunque el shell ya haya salido', async () => {
+    const { manager, ptys, processControl } = managerWithControl([777])
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
+
+    manager.close(id)
+    ptys[0]?.emitExit(0)
+    await vi.advanceTimersByTimeAsync(GRACE_MS + 10)
+
+    expect(processControl.forceKill).toHaveBeenCalledExactlyOnceWith(ptys[0]?.pid, false, [777])
+  })
+
+  it('termina antes del plazo en cuanto el shell salió y los descendientes murieron', async () => {
+    const { manager, ptys, processControl } = managerWithControl([777])
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
+    let finished = false
+
+    manager.close(id)
+    void manager.closeAll().then(() => {
+      finished = true
+    })
+    ptys[0]?.emitExit(0)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(finished).toBe(false)
+
+    processControl.alive.delete(777)
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(finished).toBe(true)
+    expect(processControl.forceKill).not.toHaveBeenCalled()
+  })
+
+  it('registra el fallo del cierre cortés pero igual libera y fuerza', async () => {
+    const { manager, ptys, logError, processControl } = managerWithControl()
+    const id = createdId(manager.create({ owner, cols: 80, rows: 24 }))
+    const pty = ptys[0]
+    if (pty === undefined) {
+      throw new Error('Sin PTY.')
+    }
+    pty.killError = new Error('ya terminó')
+
+    expect(manager.close(id)).toEqual({ ok: true })
+    expect(manager.count).toBe(0)
+    await vi.advanceTimersByTimeAsync(GRACE_MS + 10)
+
+    expect(logError).toHaveBeenCalledOnce()
+    expect(processControl.forceKill).toHaveBeenCalledOnce()
+  })
+
+  it('closeAll cierra todas las sesiones y espera a que terminen', async () => {
+    const { manager, ptys } = managerWithControl()
+    for (let index = 0; index < 3; index += 1) {
+      manager.create({ owner, cols: 80, rows: 24 })
+    }
+    let finished = false
+
+    void manager.closeAll().then(() => {
+      finished = true
+    })
+
+    expect(manager.count).toBe(0)
+    expect(ptys.map((pty) => pty.killed)).toEqual([1, 1, 1])
+    await vi.advanceTimersByTimeAsync(GRACE_MS - 1)
+    expect(finished).toBe(false)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(finished).toBe(true)
+  })
+
+  it('tras forzar, espera a que los procesos desaparezcan de verdad', async () => {
+    const { manager, processControl } = managerWithControl([901])
+    let finished = false
+    manager.create({ owner, cols: 80, rows: 24 })
+
+    void manager.closeAll().then(() => {
+      finished = true
+    })
+    await vi.advanceTimersByTimeAsync(GRACE_MS + 200)
+    expect(processControl.forceKill).toHaveBeenCalledOnce()
+    expect(finished).toBe(false)
+
+    processControl.alive.delete(901)
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(finished).toBe(true)
+  })
+
+  it('no espera para siempre a un proceso que no muere', async () => {
+    const { manager } = managerWithControl([902])
+    let finished = false
+    manager.create({ owner, cols: 80, rows: 24 })
+
+    void manager.closeAll().then(() => {
+      finished = true
+    })
+    await vi.advanceTimersByTimeAsync(GRACE_MS + 2000)
+
+    expect(finished).toBe(true)
+  })
+})
+
+describe('SessionManager: sesiones ligadas a su propietario', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('closeOwnedBy cierra solo las sesiones de ese propietario', () => {
+    vi.useFakeTimers()
+    const { manager, ptys } = makeManager()
+    const other = {}
+    manager.create({ owner, cols: 80, rows: 24 })
+    manager.create({ owner: other, cols: 80, rows: 24 })
+    manager.create({ owner, cols: 80, rows: 24 })
+
+    expect(manager.closeOwnedBy(owner)).toBe(2)
+
+    expect(manager.count).toBe(1)
+    expect(ptys.map((pty) => pty.killed)).toEqual([1, 0, 1])
+    expect(manager.closeOwnedBy({})).toBe(0)
+  })
+
+  it('un contenido nuevo no hereda ni puede operar las sesiones del anterior', () => {
+    vi.useFakeTimers()
+    const { manager } = makeManager()
+    const oldId = createdId(manager.create({ owner, cols: 80, rows: 24 }))
+
+    manager.closeOwnedBy(owner)
+
+    expect(manager.write(oldId, 'x')).toEqual({ ok: false, code: 'session_not_found' })
+    expect(manager.count).toBe(0)
+  })
+
+  const mainFrameNavigation = { isMainFrame: true, isSameDocument: false }
+
+  it.each([
+    ['navega a otro documento en el marco principal', 'did-start-navigation', mainFrameNavigation],
+    ['se recarga (navegación del marco principal)', 'did-start-navigation', mainFrameNavigation],
+    ['pierde su proceso de renderizado', 'render-process-gone', { reason: 'crashed' }],
+    ['se destruye', 'destroyed', undefined],
+  ])('cierra las sesiones cuando el contenido %s', (_description, event, payload) => {
+    vi.useFakeTimers()
+    const { manager } = makeManager()
+    const contents = new EventEmitter()
+    bindSessionLifecycle(manager, contents)
+    manager.create({ owner: contents, cols: 80, rows: 24 })
+
+    contents.emit(event, payload)
+
+    expect(manager.count).toBe(0)
+  })
+
+  it.each([
+    ['navegación dentro del mismo documento', { isMainFrame: true, isSameDocument: true }],
+    ['navegación de un subcuadro', { isMainFrame: false, isSameDocument: false }],
+    ['evento sin detalles', undefined],
+    ['detalles que no son un objeto', 'texto'],
+    ['marcadores que no son booleanos', { isMainFrame: 'true', isSameDocument: 'false' }],
+  ])('no cierra las sesiones ante %s', (_description, details) => {
+    const { manager } = makeManager()
+    const contents = new EventEmitter()
+    bindSessionLifecycle(manager, contents)
+    manager.create({ owner: contents, cols: 80, rows: 24 })
+
+    contents.emit('did-start-navigation', details)
+
+    expect(manager.count).toBe(1)
+  })
+
+  it('el enlace solo cierra las sesiones de su propio contenido', () => {
+    vi.useFakeTimers()
+    const { manager } = makeManager()
+    const first = new EventEmitter()
+    const second = new EventEmitter()
+    bindSessionLifecycle(manager, first)
+    bindSessionLifecycle(manager, second)
+    manager.create({ owner: first, cols: 80, rows: 24 })
+    manager.create({ owner: second, cols: 80, rows: 24 })
+
+    first.emit('destroyed')
+
+    expect(manager.count).toBe(1)
   })
 })

@@ -1,6 +1,7 @@
 import { homedir } from 'node:os'
 import { spawn } from 'node-pty'
 import { describe, expect, it } from 'vitest'
+import { createProcessControl } from '../src/main/process-control'
 import { SessionManager } from '../src/main/session-manager'
 import {
   chooseShell,
@@ -12,6 +13,7 @@ import { statSync } from 'node:fs'
 
 // Estos tests abren shells reales, pero solo ejecutan comandos fijos e inocuos
 // (echo y exit), con el entorno de prueba indicado y en el directorio del usuario.
+const owner = {}
 const platform = process.platform === 'win32' ? 'win32' : 'linux'
 const shells: ShellResolution = resolveShells(process.env, nodeShellFileSystem, platform)
 const shell = chooseShell(shells, undefined)
@@ -45,6 +47,7 @@ function runSession(
       env,
       homeDirectory: homedir(),
       isDirectory: (path) => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false,
+      processControl: createProcessControl(platform),
       events: {
         data: (_id, chunk) => {
           output += chunk
@@ -63,7 +66,7 @@ function runSession(
       reject(new Error(`La sesión no terminó a tiempo. Salida: ${output}`))
     }, 25_000)
 
-    const created = manager.create({ cols: 120, rows: 30 })
+    const created = manager.create({ owner, cols: 120, rows: 30 })
     if (!created.ok) {
       clearTimeout(timer)
       reject(new Error(`No se creó la sesión: ${created.code}`))
