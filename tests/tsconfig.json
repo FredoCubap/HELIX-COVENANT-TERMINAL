@@ -8,6 +8,7 @@
     "./**/*.ts",
     "../src/main/ipc.ts",
     "../src/main/security.ts",
+    "../src/main/session-manager.ts",
     "../src/main/shells.ts",
     "../src/renderer/src/global.d.ts",
     "../src/shared/**/*"
